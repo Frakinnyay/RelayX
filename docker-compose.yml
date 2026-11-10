@@ -1,0 +1,99 @@
+# Zero-cost local stack:  docker compose up --build
+# Scale workers:          docker compose up --build --scale worker=3
+name: relayx
+
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  image: relayx-backend:local
+
+x-db-env: &db-env
+  DATABASE_URL: postgres://relayx:relayx@postgres:5432/relayx
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: relayx
+      POSTGRES_PASSWORD: relayx
+      POSTGRES_DB: relayx
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relayx -d relayx"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-shot job: apply migrations, then insert the demo tenant/key/endpoint.
+  migrate:
+    <<: *backend
+    command: ["sh", "-c", "node dist/db/migrate-cli.js && node dist/scripts/seed.js"]
+    environment:
+      <<: *db-env
+      SEED_ALLOW: "true"
+      SEED_RECEIVER_URL: http://receiver:4000/webhook
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *backend
+    environment:
+      <<: *db-env
+      PORT: "3000"
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-local-admin-token-change-me}
+      CORS_ORIGIN: http://localhost:5173
+      ALLOW_PRIVATE_WEBHOOK_TARGETS: "true"   # local demo only: the receiver lives on a private Docker address
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    <<: *backend
+    command: ["node", "dist/worker/main.js"]
+    environment:
+      <<: *db-env
+      ALLOW_PRIVATE_WEBHOOK_TARGETS: "true"
+      DELIVERY_TIMEOUT_MS: "3000"
+      WORKER_CONCURRENCY: "5"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 20s     # > SHUTDOWN_GRACE_MS (15s) so Docker does not SIGKILL a draining worker
+
+  receiver:
+    <<: *backend
+    command: ["node", "dist/receiver/main.js"]
+    environment:
+      PORT: "4000"
+      RECEIVER_SECRET: whsec_demo_local_secret
+      RECEIVER_HANG_MS: "6000"
+    ports:
+      - "4000:4000"
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+        VITE_RECEIVER_URL: http://localhost:4000
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

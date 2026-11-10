@@ -1,0 +1,41 @@
+# OPTIONAL. Not needed for the local project. Read docs/AWS_DEPLOYMENT_OPTIONAL.md first.
+# Manual trigger only, so a push can never create AWS charges by accident.
+# Uses GitHub OIDC (no long-lived AWS keys in GitHub). UNTESTED until you configure the secrets below.
+name: Deploy (optional, manual)
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}   # e.g. relayx-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push backend image
+        run: |
+          IMAGE=${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY}
+          docker build -f backend/Dockerfile -t $IMAGE:${{ github.sha }} -t $IMAGE:latest .
+          docker push $IMAGE:${{ github.sha }}
+          docker push $IMAGE:latest
+      - name: Deploy on EC2 over SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          install -m 600 /dev/null key.pem && printf '%s\n' "$SSH_KEY" > key.pem
+          ssh -i key.pem -o StrictHostKeyChecking=accept-new "$EC2_USER@$EC2_HOST" \
+            "cd ~/relayx && REGISTRY=$REGISTRY ECR_REPOSITORY=$ECR_REPOSITORY ./deploy.sh"

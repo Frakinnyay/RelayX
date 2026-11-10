@@ -1,0 +1,45 @@
+# OPTIONAL: used on the EC2 instance (see docs/AWS_DEPLOYMENT_OPTIONAL.md). Reads values from ./.env on the server.
+# Option A (zero extra cost): Postgres runs as a container on the same instance (profile "localdb").
+# Option B: point DATABASE_URL at RDS and do not enable the profile. Verify RDS pricing first.
+name: relayx-prod
+
+x-backend: &backend
+  image: ${REGISTRY}/${ECR_REPOSITORY}:latest
+  restart: unless-stopped
+  env_file: .env
+  logging:
+    driver: awslogs
+    options:
+      awslogs-region: ${AWS_REGION}
+      awslogs-group: relayx
+      awslogs-create-group: "true"
+
+services:
+  postgres:
+    profiles: ["localdb"]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      retries: 20
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: ["node", "dist/db/migrate-cli.js"]
+  api:
+    <<: *backend
+    ports: ["3000:3000"]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+  worker:
+    <<: *backend
+    command: ["node", "dist/worker/main.js"]
+    stop_grace_period: 20s
+    depends_on: { migrate: { condition: service_completed_successfully } }
+volumes:
+  pgdata:

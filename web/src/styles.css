@@ -1,0 +1,31 @@
+:root { font-family: system-ui, sans-serif; color: #1a1a1a; background: #f6f7f9; }
+body { margin: 0; }
+header { background: #111827; color: #fff; padding: 10px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+header h1 { font-size: 18px; margin: 0 16px 0 0; }
+nav button { background: none; border: 0; color: #cbd5e1; padding: 6px 10px; cursor: pointer; font-size: 14px; border-radius: 4px; }
+nav button.active { background: #374151; color: #fff; }
+main { padding: 20px; max-width: 1200px; margin: 0 auto; }
+.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; }
+.card h2 { font-size: 15px; margin: 0 0 10px; }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.stat { text-align: center; }
+.stat b { display: block; font-size: 26px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+th { color: #6b7280; font-weight: 600; }
+tr.click { cursor: pointer; } tr.click:hover { background: #f9fafb; }
+button.btn { background: #2563eb; color: #fff; border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; font-size: 13px; }
+button.btn.red { background: #dc2626; } button.btn.gray { background: #6b7280; } button.btn.green { background: #16a34a; }
+button.btn:disabled { opacity: .5; cursor: not-allowed; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+input, select { padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
+input.wide { min-width: 320px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; color: #fff; }
+.PENDING { background: #6b7280; } .PROCESSING { background: #2563eb; } .RETRY_WAITING { background: #d97706; }
+.SUCCESS { background: #16a34a; } .DEAD_LETTERED { background: #dc2626; }
+.healthy { background: #16a34a; } .failing { background: #dc2626; }
+.err { color: #b91c1c; font-size: 13px; } .muted { color: #6b7280; font-size: 12px; }
+pre { background: #111827; color: #e5e7eb; padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; }
+.timeline { border-left: 3px solid #e5e7eb; margin-left: 6px; padding-left: 14px; }
+.timeline .item { margin-bottom: 10px; font-size: 13px; }
+.dup { color: #d97706; font-weight: 700; }
